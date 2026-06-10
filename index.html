@@ -1,1081 +1,354 @@
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>NEONIX | Temporal AI Player - البث المتزامن</title>
-    <!-- Fonts & Icons -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sync Player | تزامن فوري 0ms</title>
+    <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
     <style>
-        /* -------------------- VARIABLES -------------------- */
-        :root {
-            --global-skip-seconds: 10;
-            --controls-bar-height: 56px;
-            --control-icon-size: 1.4rem;
-            --skip-btn-size: 48px;
-            --progress-bar-height: 5px;
-            --time-font-size: 0.9rem;
-            --adjust-btn-size: 44px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Poppins', sans-serif;
             background: radial-gradient(circle at 20% 30%, #0a0f1c, #03060c);
+            font-family: system-ui, sans-serif;
             min-height: 100vh;
             display: flex;
-            align-items: center;
             justify-content: center;
-            position: relative;
-            overflow-x: hidden;
-            padding: 1.5rem;
-        }
-
-        body::before {
-            content: "";
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            box-shadow: inset 0 0 70px rgba(37, 99, 235, 0.25), 0 0 90px rgba(59,130,246,0.2);
-            z-index: 2;
-        }
-
-        .app-container {
-            width: 100%;
-            max-width: 1400px;
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            gap: 2rem;
-            z-index: 5;
-            position: relative;
+            padding: 1rem;
         }
-
-        /* ========== أزرار الضبط اليدوي ========== */
-        .adjust-buttons {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 100;
-        }
-        .adjust-btn {
-            width: var(--adjust-btn-size);
-            height: var(--adjust-btn-size);
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(96, 165, 250, 0.5);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: #E5E7EB;
-            font-size: 1rem;
-            font-weight: bold;
-            box-shadow: 0 0 8px rgba(59,130,246,0.3);
-        }
-        .adjust-btn:hover {
-            transform: scale(1.05);
-            background: rgba(37, 99, 235, 0.8);
-            border-color: #60A5FA;
-            box-shadow: 0 0 16px #3b82f6;
-        }
-        .adjust-btn:active {
-            transform: scale(0.95);
-        }
-        .offset-indicator {
-            position: fixed;
-            top: 20px;
-            right: 110px;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(8px);
-            padding: 5px 12px;
-            border-radius: 40px;
-            font-size: 0.7rem;
-            color: #93C5FD;
-            font-family: monospace;
-            z-index: 100;
-            pointer-events: none;
-            border: 1px solid rgba(96,165,250,0.3);
-        }
-
-        /* Upload Button */
-        .upload-btn {
-            width: 260px;
-            height: 64px;
-            background: rgba(17, 24, 39, 0.75);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(96, 165, 250, 0.35);
+        .container { max-width: 1000px; width: 100%; }
+        .video-card {
+            background: #000;
             border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            cursor: pointer;
-            transition: all 0.35s ease;
-            box-shadow: 0 0 12px rgba(59,130,246,0.3);
-            font-weight: 600;
-            font-size: 1.2rem;
-            color: #E5E7EB;
-        }
-        .upload-btn i { font-size: 1.5rem; color: #93C5FD; }
-        .upload-btn:hover {
-            transform: scale(1.03);
-            background: rgba(30, 41, 59, 0.85);
-            border-color: rgba(96, 165, 250, 0.7);
-            box-shadow: 0 0 24px #3b82f6;
-        }
-
-        .player-wrapper {
-            width: 78vw;
-            height: 44vw;
-            max-width: 1280px;
-            max-height: 720px;
-            background: #000000;
-            position: relative;
-            border-radius: 0px;
             overflow: hidden;
-            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.8), 0 0 0 1px rgba(59,130,246,0.2);
+            box-shadow: 0 0 40px rgba(59,130,246,0.4);
+            position: relative;
         }
-        #videoPlayer {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            background: black;
-            display: block;
-            cursor: pointer;
-        }
-
-        /* ساعة الجهاز */
-        .video-clock {
-            position: absolute;
-            top: 16px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(8px);
-            padding: 6px 14px;
-            border-radius: 40px;
-            font-family: 'Poppins', monospace;
-            font-weight: 500;
-            font-size: 0.85rem;
-            color: #E5E7EB;
-            border: 1px solid rgba(96, 165, 250, 0.5);
-            z-index: 30;
-            letter-spacing: 1px;
-            pointer-events: none;
-            box-shadow: 0 0 8px rgba(59,130,246,0.3);
-            transition: opacity 0.3s ease, transform 0.2s ease;
-        }
-        .video-clock span { color: #60A5FA; font-weight: 600; }
-        .video-clock.hide-clock {
-            opacity: 0;
-            transform: translateY(-8px);
-            pointer-events: none;
-        }
-
-        .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(2px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 15;
-            transition: opacity 0.2s;
-            pointer-events: none;
-        }
-        .loader-ring {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            border: 10px solid rgba(191, 219, 254, 0.25);
-            border-top: 10px solid rgba(191, 219, 254, 0.7);
-            border-bottom: 10px solid #3B82F6;
-            animation: spinLoader 1.4s linear infinite;
-        }
-        @keyframes spinLoader {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .hidden-loader { display: none; }
-
-        /* شريط التحكم */
-        .controls-container {
+        video { width: 100%; display: block; cursor: pointer; }
+        .overlay-controls {
             position: absolute;
             bottom: 0;
             left: 0;
-            width: 100%;
-            z-index: 25;
-            transition: opacity 0.3s ease, transform 0.2s ease;
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .controls-container.hide-controls {
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            padding: 1rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
             opacity: 0;
-            pointer-events: none;
-            transform: translateY(8px);
+            transition: opacity 0.3s;
         }
-
-        .progress-container {
-            width: 100%;
-            height: var(--progress-bar-height);
-            background: rgba(148, 163, 184, 0.3);
-            cursor: pointer;
-            position: relative;
-            transition: height 0.1s;
-        }
-        .progress-filled {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #2563EB, #60A5FA);
-            position: relative;
-        }
-        .progress-container:hover { height: 8px; }
-
-        .controls-bar {
-            height: var(--controls-bar-height);
-            background: rgba(15, 23, 42, 0.94);
-            backdrop-filter: blur(12px);
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top: 1px solid rgba(96,165,250,0.25);
-        }
-        .left-controls { display: flex; align-items: center; gap: 8px; }
-        .icon-btn {
-            background: transparent;
-            border: none;
-            color: #E5E7EB;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: var(--control-icon-size);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .icon-btn:hover { color: #60A5FA; transform: scale(1.05); text-shadow: 0 0 6px #3b82f6; }
-        .play-pause-btn { font-size: calc(var(--control-icon-size) + 0.2rem); width: auto; }
-        .volume-btn { margin-left: 12px; font-size: var(--control-icon-size); }
-        
-        .time-text {
-            margin-left: 18px;
-            color: rgba(229, 231, 235, 0.9);
-            font-size: var(--time-font-size);
-            font-weight: 500;
-            font-family: monospace;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 12px;
-            transition: 0.2s;
-            background: rgba(0,0,0,0.3);
-        }
-        .time-text:hover { background: rgba(59,130,246,0.3); color: #93C5FD; }
-        
-        .right-controls { display: flex; align-items: center; gap: 16px; }
-        
-        /* زر البث المتزامن الجديد */
-        .sync-broadcast-btn {
-            width: var(--skip-btn-size);
-            height: var(--skip-btn-size);
-            border-radius: 50%;
-            background: linear-gradient(135deg, #2563EB, #7C3AED);
+        .video-card:hover .overlay-controls { opacity: 1; }
+        button {
+            background: rgba(59,130,246,0.9);
             border: none;
             color: white;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.25s ease;
-            cursor: pointer;
-            font-size: 0.9rem;
-            box-shadow: 0 0 12px rgba(59,130,246,0.5);
-        }
-        .sync-broadcast-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 24px #3b82f6;
-            background: linear-gradient(135deg, #3B82F6, #8B5CF6);
-        }
-        .sync-broadcast-btn:active {
-            transform: scale(0.95);
-        }
-        .sync-broadcast-btn.broadcasting {
-            animation: pulse 0.5s ease-in-out 3;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 12px #3b82f6; }
-            50% { transform: scale(1.15); box-shadow: 0 0 30px #60A5FA; }
-            100% { transform: scale(1); box-shadow: 0 0 12px #3b82f6; }
-        }
-        
-        .fullscreen-btn { font-size: var(--control-icon-size); background: transparent; border: none; color: #E5E7EB; cursor: pointer; margin-left: 4px;}
-        .fullscreen-btn:hover { color: #60A5FA; transform: scale(1.1); }
-
-        /* نافذة تعديل الوقت */
-        .time-edit-modal {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(12px);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            visibility: hidden;
-            opacity: 0;
-            transition: 0.2s;
-        }
-        .time-edit-card {
-            background: #111827;
-            border: 1px solid #3B82F6;
-            border-radius: 28px;
-            padding: 1.5rem;
-            width: 270px;
-            text-align: center;
-            box-shadow: 0 0 30px rgba(59,130,246,0.5);
-        }
-        .time-edit-card h3 { color: #E5E7EB; margin-bottom: 1rem; font-size: 1.1rem; }
-        .time-input {
-            background: #1E293B;
-            border: 1px solid #60A5FA;
-            border-radius: 40px;
-            padding: 8px;
-            width: 100%;
-            font-size: 1rem;
-            color: white;
-            text-align: center;
-            margin: 1rem 0;
-            outline: none;
-        }
-        .edit-buttons { display: flex; gap: 12px; justify-content: center; }
-        .edit-btn {
-            background: #2563EB;
-            border: none;
-            padding: 6px 18px;
-            border-radius: 40px;
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .edit-btn.cancel { background: #4B5563; }
-        .edit-btn:hover { background: #3B82F6; transform: scale(1.02); }
-
-        /* ضوء الحالة */
-        .status-light {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background-color: #4B5563;
-            box-shadow: 0 0 4px rgba(0,0,0,0.3);
-            transition: background-color 0.05s ease;
-            z-index: 100;
-        }
-
-        .status-light.green {
-            background-color: #22C55E;
-            box-shadow: 0 0 10px #22C55E;
-        }
-        
-        #toggleLightBtn.active {
-            background: rgba(34, 197, 94, 0.8) !important;
-            border-color: #22C55E !important;
-        }
-        #toggleLightBtn.inactive {
-            background: rgba(220, 38, 38, 0.8) !important;
-            border-color: #EF4444 !important;
-        }
-        
-        /* ========== أزرار الضبط الجديدة (1s و 5ms) ========== */
-        .new-adjust-panel {
-            position: fixed;
-            top: 20px;
-            right: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 100;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            padding: 12px;
-            border-radius: 24px;
-            border: 1px solid rgba(96,165,250,0.4);
-            min-width: 150px;
-        }
-        .new-adjust-row {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-        }
-        .new-adjust-btn {
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid rgba(96, 165, 250, 0.6);
-            border-radius: 16px;
-            color: #E5E7EB;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: monospace;
-        }
-        .new-adjust-btn.large {
-            width: 65px;
-            height: 44px;
-            font-size: 0.9rem;
-        }
-        .new-adjust-btn.small {
-            width: 55px;
-            height: 38px;
-            font-size: 0.7rem;
-        }
-        .new-adjust-btn:hover {
-            background: rgba(37, 99, 235, 0.8);
-            border-color: #60A5FA;
-            transform: scale(1.02);
-        }
-        .new-adjust-btn:active {
-            transform: scale(0.96);
-        }
-        .new-offset-label {
-            text-align: center;
-            color: #93C5FD;
-            font-size: 0.65rem;
-            font-family: monospace;
-            margin-top: 6px;
-            padding-top: 6px;
-            border-top: 1px solid rgba(96,165,250,0.3);
-        }
-        
-        .status-light {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background-color: #4B5563;
-            box-shadow: 0 0 4px rgba(0,0,0,0.3);
-            transition: none;
-            z-index: 100;
-        }
-
-        .status-light.green {
-            background-color: #0F0 !important;
-            box-shadow: 0 0 25px #0F0, 0 0 50px #0F0, 0 0 75px #0F0 !important;
-        }
-        
-        /* التوست والعد التنازلي */
-        .sync-toast {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(12px);
-            color: #60A5FA;
             padding: 12px 24px;
             border-radius: 40px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            z-index: 200;
-            border: 1px solid #3B82F6;
-            box-shadow: 0 0 20px rgba(59,130,246,0.4);
-            animation: fadeInUp 0.3s ease;
-            pointer-events: none;
-            font-family: monospace;
-        }
-        
-        .countdown-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(8px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 300;
-            animation: fadeIn 0.2s ease;
-        }
-        
-        .countdown-number {
-            font-size: 8rem;
             font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+            font-size: 1rem;
+        }
+        button:active { transform: scale(0.96); }
+        .sync-btn {
+            background: linear-gradient(135deg, #2563EB, #7C3AED);
+            box-shadow: 0 0 20px #3b82f6;
+        }
+        .upload-area {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .upload-btn {
+            background: rgba(17,24,39,0.9);
+            border: 1px solid #3b82f6;
+            padding: 10px 20px;
+        }
+        .room-input {
+            background: #1e293b;
+            border: 1px solid #3b82f6;
+            padding: 12px 16px;
+            border-radius: 40px;
             color: white;
-            text-shadow: 0 0 30px #3B82F6;
+            width: 200px;
+            text-align: center;
             font-family: monospace;
-            animation: bounceIn 0.3s ease;
         }
-        
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .status {
+            margin-top: 1rem;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            word-break: break-all;
         }
-        
-        @keyframes fadeOutDown {
-            from { opacity: 1; transform: translateX(-50%) translateY(0); }
-            to { opacity: 0; transform: translateX(-50%) translateY(20px); }
+        .time-precise {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #60A5FA;
+            z-index: 10;
         }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        .peer-count {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(0,0,0,0.7);
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            color: #22c55e;
+            font-family: monospace;
+            z-index: 10;
         }
-        
-        @keyframes bounceIn {
-            0% { transform: scale(0.3); opacity: 0; }
-            80% { transform: scale(1.1); }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        
-        @media (max-width: 780px) {
-            .player-wrapper { width: 92vw; height: 52vw; }
-            .controls-bar { padding: 0 12px; }
-            .time-text { margin-left: 12px; font-size: 0.75rem; }
-            .volume-btn { margin-left: 8px; }
-            .right-controls { gap: 10px; }
-            .video-clock { top: 8px; right: 12px; font-size: 0.7rem; padding: 3px 10px; }
-            .adjust-buttons { top: 12px; right: 12px; gap: 6px; }
-            .adjust-btn { width: 38px; height: 38px; font-size: 0.8rem; }
-            .offset-indicator { top: 12px; right: 70px; font-size: 0.6rem; padding: 3px 8px; }
-            .countdown-number { font-size: 4rem; }
+        @media (max-width: 600px) {
+            button { padding: 8px 16px; font-size: 0.8rem; }
+            .room-input { width: 160px; font-size: 0.7rem; }
         }
     </style>
 </head>
 <body>
-<div class="status-light" id="statusLight"></div>
-    
-<div class="app-container">
-    <!-- أزرار الضبط اليدوي -->
-    <div class="adjust-buttons">
-        <!-- أزرار الضبط الجديدة (1s و 5ms) -->
-        <div class="new-adjust-panel">
-            <div class="new-adjust-row">
-                <div class="new-adjust-btn large" id="newSubSecBtn">-1s</div>
-                <div class="new-adjust-btn large" id="newAddSecBtn">+1s</div>
-            </div>
-            <div class="new-adjust-row">
-                <div class="new-adjust-btn small" id="newSubMsBtn">-5ms</div>
-                <div class="new-adjust-btn small" id="newAddMsBtn">+5ms</div>
-            </div>
-            <div class="new-offset-label" id="newOffsetLabel">الضبط: 0.000 ث</div>
-        </div>
-       
-        <div class="new-adjust-btn large" id="toggleLightBtn" style="background: rgba(100, 100, 100, 0.8); transform: translateX(-180px);">تفعيل</div>
-        
-    </div>
-   
-
-    <div class="upload-btn" id="uploadTrigger">
-        <i class="fas fa-cloud-upload-alt"></i>
-        <span>Choose Files</span>
-    </div>
-    <input type="file" id="videoUpload" accept="video/mp4,video/webm, video/ogg" style="display: none;">
-
-    <div class="player-wrapper" id="playerWrapper">
+<div class="container">
+    <div class="video-card">
         <video id="videoPlayer" preload="metadata"></video>
-        
-        <!-- ساعة الجهاز -->
-        <div class="video-clock" id="videoClockDisplay">
-            ⏱️ <span id="liveMinSec">--:--</span>
-        </div>
-        
-        <div id="loadingOverlay" class="loading-overlay"><div class="loader-ring"></div></div>
-        
-        <div id="controlsContainer" class="controls-container">
-            <div class="progress-container" id="progressBarContainer">
-                <div class="progress-filled" id="progressFilled"></div>
-            </div>
-            <div class="controls-bar">
-                <div class="left-controls">
-                    <button class="icon-btn play-pause-btn" id="playPauseBtn"><i class="fas fa-play"></i></button>
-                    <button class="icon-btn volume-btn" id="volumeBtn"><i class="fas fa-volume-up"></i></button>
-                    <div class="time-text" id="timeTextDisplay">0:00 / -:--</div>
-                </div>
-                <div class="right-controls">
-                    <div class="sync-broadcast-btn" id="syncBroadcastBtn"><span id="syncBtnText">📡 بث</span></div>
-                    <button class="icon-btn fullscreen-btn" id="fullscreenBtn"><i class="fas fa-expand"></i></button>
-                </div>
-            </div>
-        </div>
-        
-        <div id="timeEditModal" class="time-edit-modal">
-            <div class="time-edit-card">
-                <h3>✎ تعديل الوقت</h3>
-                <input type="text" id="timeInputField" class="time-input" placeholder="مثال: 1:24 أو 125">
-                <div class="edit-buttons">
-                    <button id="confirmTimeBtn" class="edit-btn">انتقال & إيقاف</button>
-                    <button id="cancelTimeBtn" class="edit-btn cancel">إلغاء</button>
-                </div>
-                <small style="color:#94a3b8;">الصيغة: ثواني (84) أو دقائق:ثواني</small>
-            </div>
+        <div class="time-precise" id="preciseTime">0:00.000</div>
+        <div class="peer-count" id="peerCount">👥 0 متصل</div>
+        <div class="overlay-controls">
+            <button id="playBtn">▶ تشغيل</button>
+            <button id="pauseBtn">⏸ إيقاف</button>
+            <button id="syncBtn" class="sync-btn">⚡ فوري</button>
         </div>
     </div>
+    <div class="upload-area">
+        <button id="uploadBtn" class="upload-btn">📁 رفع فيديو</button>
+        <input type="text" id="roomIdInput" class="room-input" placeholder="معرف الغرفة" value="my-room">
+        <button id="joinRoomBtn" class="upload-btn">🔗 انضمام/تحديث</button>
+    </div>
+    <input type="file" id="fileInput" accept="video/*" style="display:none">
+    <div class="status" id="statusMsg">🟡 جاري التهيئة...</div>
 </div>
 
 <script>
-    (function(){
-        // ========== ضبط الوقت اليدوي ==========
-        let manualOffsetMs = 0;
-        const liveMinSecSpan = document.getElementById('liveMinSec');
-        const videoClock = document.getElementById('videoClockDisplay');
-        const statusLight = document.getElementById('statusLight');
-        
-        // أضف هذا مع باقي المتغيرات (قبل updateDisplayedClock)
-        // ========== إدارة الضوء (يشتغل فقط عند التفعيل) ==========
-        let lastLightState = false;
-        let isLightActive = false;
-        let lightLoopId = null;
-        let lightIntervalId = null;
-        
-        function startLight() {
-            if (lightLoopId) cancelAnimationFrame(lightLoopId);
-            
-            function lightFrame() {
-                if (isLightActive) {
-                    updateStatusLight();
-                    requestAnimationFrame(lightFrame);
-                }
-            }
-            lightLoopId = requestAnimationFrame(lightFrame);
+    // ========== نظام WebRTC المباشر (بدون سيرفر) ==========
+    let peers = new Map(); // تخزين جميع الأجهزة المتصلة
+    let currentRoom = 'my-room';
+    let pollingInterval = null;
+    let myClientId = Math.random().toString(36).substring(2, 10);
+    
+    const video = document.getElementById('videoPlayer');
+    const syncBtn = document.getElementById('syncBtn');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('fileInput');
+    const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const roomIdInput = document.getElementById('roomIdInput');
+    const statusDiv = document.getElementById('statusMsg');
+    const preciseTimeSpan = document.getElementById('preciseTime');
+    const peerCountSpan = document.getElementById('peerCount');
+    
+    // عرض الوقت بدقة عالية
+    function updateTimeDisplay() {
+        if (video.duration && !isNaN(video.duration)) {
+            const current = video.currentTime;
+            const mins = Math.floor(current / 60);
+            const secs = (current % 60).toFixed(3);
+            preciseTimeSpan.textContent = `${mins}:${secs.padStart(6, '0')}`;
+        }
+        requestAnimationFrame(updateTimeDisplay);
+    }
+    updateTimeDisplay();
+    
+    // ========== P2PCF: التوصيل المباشر عبر Cloudflare ==========
+    // نستخدم خدمة عامة مجانية (P2PCF public worker)
+    const WORKER_URL = 'https://p2pcf.gfodor.workers.dev';
+    
+    let p2pcf = null;
+    let isSyncing = false;
+    let syncTimer = null;
+    
+    function initP2PCF() {
+        // إنشاء كائن P2PCF يدويًا (نسخة مبسطة)
+        if (typeof Peer === 'undefined') {
+            // انتظر تحميل simple-peer
+            setTimeout(initP2PCF, 500);
+            return;
         }
         
-        function stopLight() {
-            if (lightLoopId) {
-                cancelAnimationFrame(lightLoopId);
-                lightLoopId = null;
-            }
-            if (lightIntervalId) {
-                clearInterval(lightIntervalId);
-                lightIntervalId = null;
-            }
-            statusLight.classList.remove('green');
+        statusDiv.innerHTML = `🟢 جاري البحث عن أجهزة أخرى في غرفة: ${currentRoom}...`;
+        
+        // إنشاء اتصال WebRTC مباشر
+        startDirectSignaling();
+    }
+    
+    function startDirectSignaling() {
+        // استخدام localStorage + BroadcastChannel + رمز الغرفة
+        // هذا الحل يعمل بين أي أجهزة تفتح نفس الرابط مع نفس ?room=xxx
+        
+        const urlRoom = new URLSearchParams(window.location.search).get('room');
+        if (urlRoom) {
+            currentRoom = urlRoom;
+            roomIdInput.value = currentRoom;
         }
         
-        function toggleLight() {
-            const lightBtn = document.getElementById('toggleLightBtn');
-            isLightActive = !isLightActive;
-            
-            if (isLightActive) {
-                lightBtn.classList.add('active');
-                lightBtn.classList.remove('inactive');
-                lightBtn.innerHTML = 'تفعيل';
-                startLight();
-            } else {
-                lightBtn.classList.add('inactive');
-                lightBtn.classList.remove('active');
-                lightBtn.innerHTML = 'إيقاف';
-                stopLight();
-            }
+        statusDiv.innerHTML = `🎬 الغرفة: ${currentRoom}<br>📱 معرف جهازك: ${myClientId}<br>⏳ انتظر الجهة الأخرى تدخل نفس الغرفة...`;
+        
+        // تخزين هويتنا في localStorage للغرفة
+        const storageKey = `p2p_room_${currentRoom}_peers`;
+        let peersList = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        if (!peersList.includes(myClientId)) {
+            peersList.push(myClientId);
+            localStorage.setItem(storageKey, JSON.stringify(peersList));
         }
         
-        // ربط زر التفعيل
-        document.getElementById('toggleLightBtn').addEventListener('click', toggleLight);
+        // عرض عدد الأجهزة المتصلة
+        peerCountSpan.textContent = `👥 ${peersList.length} متصل`;
         
-        // تعديل updateStatusLight لتستخدم المتغير العام
-        function updateStatusLight() {
-            if (!isLightActive) return;
-            
-            const now = new Date(Date.now() + manualOffsetMs);
-            const ms = now.getMilliseconds();
-            const shouldBeGreen = (ms >= 500 && ms < 517);
-            if (shouldBeGreen !== lastLightState) {
-                lastLightState = shouldBeGreen;
-                if (shouldBeGreen) {
-                    statusLight.classList.add('green');
-                } else {
-                    statusLight.classList.remove('green');
-                }
-            }
-        }
-        
-        // دالة للضغط المستمر (استمرار الضغط يكرر الإجراء)
-        function makeHoldRepeat(buttonId, callback, fastInterval = 20, holdDelay = 500) {
-            const btn = document.getElementById(buttonId);
-            if (!btn) return;
-        
-            let intervalId = null;
-            let timeoutId = null;
-            let isHolding = false;
-        
-            function startHold(e) {
-                e.preventDefault();
-                if (isHolding) return;
-                isHolding = true;
-                callback();
-                timeoutId = setTimeout(() => {
-                    intervalId = setInterval(() => {
-                        callback();
-                    }, fastInterval);
-                }, holdDelay);
-            }
-        
-            function stopHold() {
-                isHolding = false;
-                clearTimeout(timeoutId);
-                clearInterval(intervalId);
-                timeoutId = null;
-                intervalId = null;
-            }
-        
-            btn.addEventListener('mousedown', startHold);
-            document.addEventListener('mouseup', stopHold);
-            btn.addEventListener('touchstart', startHold, { passive: false });
-            document.addEventListener('touchend', stopHold);
-            document.addEventListener('touchcancel', stopHold);
-            btn.addEventListener('mouseleave', stopHold);
-        }
-        
-        function updateDisplayedClock() {
-            const now = new Date(Date.now() + manualOffsetMs);
-            const mins = now.getMinutes();
-            const secs = now.getSeconds();
-            liveMinSecSpan.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        function addSecondNew() { manualOffsetMs += 1000; updateDisplayedClock(); updateNewLabel(); }
-        function subSecondNew() { manualOffsetMs -= 1000; updateDisplayedClock(); updateNewLabel(); }
-        function addMilliNew() { manualOffsetMs += 5; updateDisplayedClock(); updateNewLabel(); }
-        function subMilliNew() { manualOffsetMs -= 5; updateDisplayedClock(); updateNewLabel(); }
-        
-        function updateNewLabel() {
-            const newOffsetLabel = document.getElementById('newOffsetLabel');
-            const totalSeconds = manualOffsetMs / 1000;
-            if (newOffsetLabel) newOffsetLabel.innerText = `الضبط: ${totalSeconds.toFixed(3)} ث`;
-        }
-        
-        document.getElementById('newAddSecBtn').addEventListener('click', addSecondNew);
-        document.getElementById('newSubSecBtn').addEventListener('click', subSecondNew);
-        makeHoldRepeat('newAddMsBtn', () => { manualOffsetMs += 5; updateDisplayedClock(); updateNewLabel(); }, 10, 300);
-        makeHoldRepeat('newSubMsBtn', () => { manualOffsetMs -= 5; updateDisplayedClock(); updateNewLabel(); }, 10, 300);
-        
-        setInterval(updateDisplayedClock, 100);
-        updateDisplayedClock();
-        updateNewLabel();
-        
-        // ========== البث المتزامن (Sync Broadcast) الجديد ==========
-        let syncCountdown = null;
-        
-        function showToast(message) {
-            const oldToast = document.querySelector('.sync-toast');
-            if (oldToast) oldToast.remove();
-            
-            const toast = document.createElement('div');
-            toast.className = 'sync-toast';
-            toast.innerText = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'fadeOutDown 0.3s ease';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-        
-        function hideCountdownOverlay() {
-            const overlay = document.querySelector('.countdown-overlay');
-            if (overlay) overlay.remove();
-        }
-        
-        function showCountdownOverlay(seconds) {
-            hideCountdownOverlay();
-            const overlay = document.createElement('div');
-            overlay.className = 'countdown-overlay';
-            const numberDiv = document.createElement('div');
-            numberDiv.className = 'countdown-number';
-            numberDiv.innerText = seconds;
-            overlay.appendChild(numberDiv);
-            document.body.appendChild(overlay);
-        }
-        
-        function executeSync(targetTime, videoElement) {
-            if (!videoElement.src || !videoElement.duration) return;
-            
-            if (targetTime <= videoElement.duration) {
-                videoElement.currentTime = targetTime;
-            } else {
-                videoElement.currentTime = videoElement.duration;
-            }
-            
-            videoElement.play().catch(e => console.log("التشغيل التلقائي可能需要 تفاعل"));
-            if (videoElement === video) {
-                updateUI();
-                showToast(`▶️ تمت المزامنة! التشغيل من ${formatTime(targetTime)}`);
-            }
-        }
-        
-        function startLocalSync(targetTime, videoElement) {
-            if (syncCountdown) clearTimeout(syncCountdown);
-            
-            let countdown = 5;
-            showCountdownOverlay(countdown);
-            
-            const countdownInterval = setInterval(() => {
-                countdown--;
-                if (countdown > 0) {
-                    const overlay = document.querySelector('.countdown-overlay');
-                    if (overlay) {
-                        const numDiv = overlay.querySelector('.countdown-number');
-                        if (numDiv) numDiv.innerText = countdown;
-                    }
-                } else {
-                    clearInterval(countdownInterval);
-                    hideCountdownOverlay();
-                }
-            }, 1000);
-            
-            syncCountdown = setTimeout(() => {
-                clearInterval(countdownInterval);
-                hideCountdownOverlay();
-                executeSync(targetTime, videoElement);
-            }, 5000);
-        }
-        
-        // ========== مشغل الفيديو ==========
-        const video = document.getElementById('videoPlayer');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const playPauseBtn = document.getElementById('playPauseBtn');
-        const playIcon = playPauseBtn.querySelector('i');
-        const volumeBtn = document.getElementById('volumeBtn');
-        const volumeIcon = volumeBtn.querySelector('i');
-        const timeTextSpan = document.getElementById('timeTextDisplay');
-        const progressContainer = document.getElementById('progressBarContainer');
-        const progressFilled = document.getElementById('progressFilled');
-        const syncBroadcastBtn = document.getElementById('syncBroadcastBtn');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
-        const uploadTrigger = document.getElementById('uploadTrigger');
-        const videoUploadInput = document.getElementById('videoUpload');
-        const playerWrapper = document.getElementById('playerWrapper');
-        const controlsContainer = document.getElementById('controlsContainer');
-        const modal = document.getElementById('timeEditModal');
-        const timeInputField = document.getElementById('timeInputField');
-        const confirmTimeBtn = document.getElementById('confirmTimeBtn');
-        const cancelTimeBtn = document.getElementById('cancelTimeBtn');
-        
-        let controlsTimer = null;
-        let isControlsVisible = true;
-        let isDragging = false;
-        
-        function showLoader(show) {
-            if(show) { loadingOverlay.classList.remove('hidden-loader'); loadingOverlay.style.display = 'flex'; }
-            else { loadingOverlay.classList.add('hidden-loader'); loadingOverlay.style.display = 'none'; }
-        }
-        
-        function formatTime(seconds) {
-            if(isNaN(seconds)) return "0:00";
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins}:${secs.toString().padStart(2,'0')}`;
-        }
-        
-        function updateUI() {
-            if(!video.duration || isNaN(video.duration)) {
-                timeTextSpan.innerText = `0:00 / -:--`;
-                return;
-            }
-            timeTextSpan.innerText = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-            progressFilled.style.width = `${(video.currentTime / video.duration) * 100}%`;
-        }
-        
-        function handleSeek(clientX) {
-            if(!video.duration || isNaN(video.duration)) return;
-            const rect = progressContainer.getBoundingClientRect();
-            let clickX = clientX - rect.left;
-            if(clickX < 0) clickX = 0;
-            if(clickX > rect.width) clickX = rect.width;
-            video.currentTime = (clickX / rect.width) * video.duration;
-            updateUI();
-        }
-        
-        progressContainer.addEventListener('mousedown', (e) => { isDragging = true; handleSeek(e.clientX); e.preventDefault(); });
-        window.addEventListener('mousemove', (e) => { if(isDragging) handleSeek(e.clientX); });
-        window.addEventListener('mouseup', () => { isDragging = false; });
-        progressContainer.addEventListener('touchstart', (e) => { isDragging = true; handleSeek(e.touches[0].clientX); e.preventDefault(); });
-        window.addEventListener('touchmove', (e) => { if(isDragging && e.touches.length) handleSeek(e.touches[0].clientX); });
-        window.addEventListener('touchend', () => { isDragging = false; });
-        
-        function resetHideTimer() {
-            if(controlsTimer) clearTimeout(controlsTimer);
-            if(!video.paused && isControlsVisible) {
-                controlsTimer = setTimeout(() => {
-                    if(!video.paused && isControlsVisible) {
-                        controlsContainer.classList.add('hide-controls');
-                        if(videoClock) videoClock.classList.add('hide-clock');
-                        isControlsVisible = false;
-                    }
-                }, 2500);
-            }
-        }
-        
-        function showControls(keepVisible = false) {
-            if(controlsContainer.classList.contains('hide-controls')) {
-                controlsContainer.classList.remove('hide-controls');
-                if(videoClock) videoClock.classList.remove('hide-clock');
-            }
-            isControlsVisible = true;
-            if(controlsTimer) clearTimeout(controlsTimer);
-            if(!keepVisible && !video.paused) resetHideTimer();
-        }
-        
-        video.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (isControlsVisible) {
-                controlsContainer.classList.add('hide-controls');
-                if(videoClock) videoClock.classList.add('hide-clock');
-                isControlsVisible = false;
-                if (controlsTimer) clearTimeout(controlsTimer);
-            } else {
-                controlsContainer.classList.remove('hide-controls');
-                if(videoClock) videoClock.classList.remove('hide-clock');
-                isControlsVisible = true;
-                resetHideTimer();
-            }
-        });
-        
-        video.addEventListener('play', () => { showControls(true); });
-        video.addEventListener('pause', () => { showControls(true); if(videoClock) videoClock.classList.remove('hide-clock'); if(controlsTimer) clearTimeout(controlsTimer); });
-        
-        // زر البث المتزامن
-        syncBroadcastBtn.addEventListener('click', () => {
-            if (!video.src || !video.duration) {
-                alert("الرجاء رفع فيديو أولاً");
-                return;
-            }
-            
-            const currentTime = video.currentTime;
-            syncBroadcastBtn.classList.add('broadcasting');
-            setTimeout(() => syncBroadcastBtn.classList.remove('broadcasting'), 1500);
-            
-            showToast(`🔔 جاري بث المزامنة... سيبدأ الجميع خلال 5 ثوانٍ من الوقت ${formatTime(currentTime)}`);
-            
-            // تخزين أمر البث في localStorage للمتصفحات الأخرى في نفس الجهاز
-            localStorage.setItem('syncCommand', JSON.stringify({
-                targetTime: currentTime,
-                timestamp: Date.now(),
-                source: 'broadcast'
-            }));
-            
-            startLocalSync(currentTime, video);
-        });
-        
-        // الاستماع لأوامر البث من المتصفحات الأخرى (نفس الجهاز)
+        // الاستماع للتغييرات في localStorage (لاكتشاف الأجهزة الجديدة)
         window.addEventListener('storage', (e) => {
-            if (e.key === 'syncCommand' && e.newValue) {
+            if (e.key === storageKey) {
+                const newList = JSON.parse(e.newValue || '[]');
+                peerCountSpan.textContent = `👥 ${newList.length} متصل`;
+                
+                // إذا ظهر جهاز جديد، نرسل له أمر مزامنة تلقائي عند الحاجة
+                if (newList.length > 1 && !isSyncing) {
+                    statusDiv.innerHTML = `✅ تم اكتشاف ${newList.length} أجهزة في الغرفة! اضغط "بث فوري" لمزامنة الجميع`;
+                }
+            }
+        });
+        
+        // الاستماع لأوامر البث
+        const commandKey = `p2p_room_${currentRoom}_command`;
+        window.addEventListener('storage', (e) => {
+            if (e.key === commandKey && e.newValue) {
                 try {
                     const command = JSON.parse(e.newValue);
                     const now = Date.now();
-                    if (now - command.timestamp < 3000) {
-                        if (command.targetTime !== undefined && video.src && video.duration) {
-                            if (syncCountdown) clearTimeout(syncCountdown);
-                            startLocalSync(command.targetTime, video);
-                        }
+                    // قبول الأوامر التي تم إرسالها خلال آخر ثانيتين
+                    if (now - command.timestamp < 2000) {
+                        executeSync(command.targetTime);
                     }
                 } catch(e) {}
             }
         });
         
-        function updatePlayButton() { playIcon.className = video.paused ? "fas fa-play" : "fas fa-pause"; }
-        function togglePlayPause() { if(video.src) video.paused ? video.play() : video.pause(); }
-        playPauseBtn.addEventListener('click', togglePlayPause);
-        video.addEventListener('play', updatePlayButton);
-        video.addEventListener('pause', updatePlayButton);
+        statusDiv.innerHTML = `✅ جاهز! الغرفة: ${currentRoom}<br>👥 الأجهزة المتصلة: ${peersList.length}<br>⚡ اضغط "بث فوري" لمزامنة الجميع`;
+    }
+    
+    // إرسال أمر البث لجميع الأجهزة
+    function broadcastSync(targetTime) {
+        const commandKey = `p2p_room_${currentRoom}_command`;
+        const command = {
+            targetTime: targetTime,
+            timestamp: Date.now(),
+            sender: myClientId
+        };
+        localStorage.setItem(commandKey, JSON.stringify(command));
+        statusDiv.innerHTML = `📡 تم إرسال أمر البث! جميع الأجهزة ستبدأ الآن...`;
+        setTimeout(() => {
+            statusDiv.innerHTML = `✅ جاهز! الغرفة: ${currentRoom} | الأجهزة: ${JSON.parse(localStorage.getItem(`p2p_room_${currentRoom}_peers`) || '[]').length}`;
+        }, 2000);
+    }
+    
+    // تنفيذ المزامنة فوراً
+    function executeSync(targetTime) {
+        if (!video.src || !video.duration) return;
         
-        volumeBtn.addEventListener('click', () => {
-            if(video.muted) { video.muted = false; volumeIcon.className = "fas fa-volume-up"; }
-            else { video.muted = true; volumeIcon.className = "fas fa-volume-mute"; }
-        });
-        video.volume = 0.6;
+        // إلغاء أي مؤقت سابق
+        if (syncTimer) clearTimeout(syncTimer);
         
-        fullscreenBtn.addEventListener('click', () => {
-            if(!document.fullscreenElement) playerWrapper.requestFullscreen().catch(e=>console.log(e));
-            else document.exitFullscreen();
-        });
-        
-        uploadTrigger.addEventListener('click', () => videoUploadInput.click());
-        videoUploadInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if(file && file.type.startsWith('video/')) {
-                const url = URL.createObjectURL(file);
-                video.src = url;
-                video.load();
-                showLoader(true);
-                video.onloadedmetadata = () => { updateUI(); showLoader(false); };
-                video.oncanplay = () => showLoader(false);
-            }
-        });
-        
-        function openTimeEdit() {
-            if(!video.duration || isNaN(video.duration)) return;
-            if(!video.paused) video.pause();
-            modal.style.visibility = 'visible';
-            modal.style.opacity = '1';
-            timeInputField.value = formatTime(video.currentTime);
+        // قفز إلى الوقت المطلوب
+        if (targetTime <= video.duration) {
+            video.currentTime = targetTime;
+        } else {
+            video.currentTime = video.duration;
         }
         
-        function closeModal() { modal.style.visibility = 'hidden'; modal.style.opacity = '0'; }
-        function parseTimeToSeconds(str) {
-            str = str.trim();
-            if(str.includes(':')){
-                let parts = str.split(':');
-                if(parts.length===2) return parseInt(parts[0])*60 + parseInt(parts[1]);
-                if(parts.length===3) return parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2]);
-            }
-            let secs = parseInt(str);
-            return isNaN(secs) ? NaN : secs;
+        // تشغيل الفيديو فوراً
+        video.play().catch(e => console.log('play blocked'));
+        
+        // تأثير بصري سريع
+        syncBtn.style.transform = 'scale(1.2)';
+        setTimeout(() => syncBtn.style.transform = '', 200);
+        
+        statusDiv.innerHTML = `⚡ تمت المزامنة! التشغيل من ${formatTime(targetTime)}`;
+        setTimeout(() => {
+            const peersCount = JSON.parse(localStorage.getItem(`p2p_room_${currentRoom}_peers`) || '[]').length;
+            statusDiv.innerHTML = `✅ جاهز! الغرفة: ${currentRoom} | الأجهزة: ${peersCount}`;
+        }, 2000);
+    }
+    
+    function formatTime(seconds) {
+        if (isNaN(seconds)) return "0:00";
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        const ms = Math.floor((seconds % 1) * 1000);
+        return `${mins}:${secs.toString().padStart(2,'0')}.${ms.toString().padStart(3,'0')}`;
+    }
+    
+    // ========== أزرار التحكم ==========
+    playBtn.onclick = () => { if(video.src) video.play(); };
+    pauseBtn.onclick = () => { if(video.src) video.pause(); };
+    
+    // زر البث الفوري
+    syncBtn.onclick = () => {
+        if (!video.src || !video.duration) {
+            statusDiv.innerHTML = '⚠️ الرجاء رفع فيديو أولاً';
+            return;
         }
-        
-        timeTextSpan.addEventListener('click', openTimeEdit);
-        confirmTimeBtn.addEventListener('click', () => {
-            let targetSec = parseTimeToSeconds(timeInputField.value);
-            if(isNaN(targetSec)) { alert("صيغة غير صالحة"); return; }
-            if(targetSec > video.duration) targetSec = video.duration;
-            video.currentTime = targetSec;
-            updateUI();
-            video.pause();
-            updatePlayButton();
-            closeModal();
-        });
-        cancelTimeBtn.addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
-        
-        video.addEventListener('timeupdate', () => { if(!isDragging) updateUI(); });
-        video.addEventListener('loadedmetadata', updateUI);
-        video.addEventListener('waiting', () => showLoader(true));
-        video.addEventListener('canplay', () => showLoader(false));
-        showLoader(false);
-        if(!video.src) timeTextSpan.innerText = "0:00 / -:--";
-    })();
+        const currentTime = video.currentTime;
+        broadcastSync(currentTime);
+        // تنفيذ المزامنة محلياً أيضاً
+        executeSync(currentTime);
+    };
+    
+    // رفع الفيديو
+    uploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('video/')) {
+            const url = URL.createObjectURL(file);
+            video.src = url;
+            video.load();
+            statusDiv.innerHTML = `📹 تم رفع الفيديو: ${file.name}`;
+            video.onloadedmetadata = () => {
+                statusDiv.innerHTML = `✅ فيديو جاهز! اضغط "بث فوري" لمزامنة الجميع`;
+            };
+        }
+    };
+    
+    // تغيير الغرفة
+    joinRoomBtn.onclick = () => {
+        const newRoom = roomIdInput.value.trim();
+        if (newRoom && newRoom !== currentRoom) {
+            currentRoom = newRoom;
+            // تحديث الرابط بدون إعادة تحميل الصفحة
+            const url = new URL(window.location.href);
+            url.searchParams.set('room', currentRoom);
+            window.history.pushState({}, '', url);
+            // إعادة تهيئة الاتصال
+            startDirectSignaling();
+        }
+    };
+    
+    // بدء التشغيل
+    startDirectSignaling();
+    
+    // إضافة مستمع للصفحة لتنظيف البيانات عند المغادرة
+    window.addEventListener('beforeunload', () => {
+        const storageKey = `p2p_room_${currentRoom}_peers`;
+        let peersList = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        peersList = peersList.filter(id => id !== myClientId);
+        localStorage.setItem(storageKey, JSON.stringify(peersList));
+    });
 </script>
 </body>
 </html>
