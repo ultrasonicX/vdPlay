@@ -833,12 +833,22 @@ function connectSocket() {
         showToast('⚠️ مشكلة في الاتصال، حاول تحديث الصفحة');
     });
     
-    socket.on('execute-sync', (data) => {
-        console.log('📥 استلام أمر بث:', data);
-        if (data.targetTime !== undefined && data.startAt) {
+socket.on('execute-sync', (data) => {
+    console.log('📥 استلام أمر بث:', data);
+    if (data.targetTime !== undefined) {
+        // أولاً: النقل الفوري لنفس الوقت (بدون انتظار)
+        if (video.src && video.duration && data.targetTime <= video.duration) {
+            video.currentTime = data.targetTime;
+            video.pause();
+            showToast(`⏩ نقل فوري إلى ${formatTime(data.targetTime)}`);
+        }
+        
+        // ثانياً: العد التنازلي والتشغيل المتزامن
+        if (data.startAt) {
             executeSyncPrecise(data.targetTime, data.startAt);
         }
-    });
+    }
+});
     
     socket.on('disconnect', () => {
         console.log('❌ انقطع الاتصال');
