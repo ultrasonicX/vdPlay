@@ -751,36 +751,72 @@
         }
         
         // ========== تنفيذ المزامنة الدقيقة ==========
-        function executeSyncPrecise(targetTime, startAt) {
-            if (!video.src || !video.duration) return;
-            
-            const now = Date.now();
-            let delay = startAt - now;
-            
-            if (serverOffset !== 0) {
-                delay = startAt - (now + serverOffset);
-            }
-            
-            console.log(`⏱️ التأخير المتبقي: ${delay}ms | targetTime: ${targetTime}`);
-            
-            if (delay < 0) {
+        
+// تنفيذ المزامنة بدقة عالية جداً
+function executeSyncPrecise(targetTime, startAt) {
+    if (!video.src || !video.duration) return;
+    
+    // استخدام performance.now() لدقة أعلى من Date.now()
+    const now = performance.now() + performance.timeOrigin;
+    let delay = startAt - (now + serverOffset);
+    
+    console.log(`⏱️ التأخير المحسوب: ${delay.toFixed(2)}ms | targetTime: ${targetTime}`);
+    
+    if (delay < 0) {
+        // فات الوقت، تنفيذ فوري مع تصحيح
+        video.currentTime = targetTime;
+        video.play().catch(e => console.log).then(() => {
+            const diff = video.currentTime - targetTime;
+            if (Math.abs(diff) > 0.03) {
                 video.currentTime = targetTime;
-                video.play().catch(e => console.log);
-                showToast(`⚡ مزامنة فورية! التشغيل من ${formatTime(targetTime)}`);
-                return;
             }
+        });
+        showToast(`⚡ مزامنة فورية! التشغيل من ${formatTime(targetTime)}`);
+        return;
+    }
+    
+    // عرض العد التنازلي (Math.floor بدل Math.ceil لتجنب القفزات)
+    const remainingSeconds = Math.floor(delay / 1000);
+    showCountdownPrecise(Math.max(1, remainingSeconds));
+    
+    // استخدام requestAnimationFrame بدل setTimeout لدقة أعلى
+    const target = (performance.now() + performance.timeOrigin) + delay;
+    
+    function waitForSync() {
+        const nowTime = performance.now() + performance.timeOrigin;
+        if (nowTime >= target) {
+            video.currentTime = targetTime;
+            video.play().catch(e => console.log).then(() => {
+                // تصحيح بسيط بعد التشغيل
+                const diff = video.currentTime - targetTime;
+                if (Math.abs(diff) > 0.03) {
+                    video.currentTime = targetTime;
+                }
+            });
+            hideCountdownOverlay();
+            showToast(`🎯 مزامنة دقيقة! التشغيل من ${formatTime(targetTime)}`);
             
-            showCountdownPrecise(Math.ceil(delay / 1000));
-            
-            setTimeout(() => {
-                video.currentTime = targetTime;
-                video.play().catch(e => console.log);
-                showToast(`🎯 مزامنة دقيقة! التشغيل من ${formatTime(targetTime)}`);
-                
-                syncBroadcastBtn.classList.add('broadcasting');
-                setTimeout(() => syncBroadcastBtn.classList.remove('broadcasting'), 500);
-            }, Math.max(delay, 0));
+            const syncBtn = document.getElementById('syncBroadcastBtn');
+            if (syncBtn) {
+                syncBtn.classList.add('broadcasting');
+                setTimeout(() => syncBtn.classList.remove('broadcasting'), 500);
+            }
+        } else {
+            // تحديث العد التنازلي إذا تغير
+            const remaining = Math.floor((target - nowTime) / 1000);
+            const overlay = document.querySelector('.countdown-overlay');
+            if (overlay && remaining >= 0) {
+                const numDiv = overlay.querySelector('.countdown-number');
+                if (numDiv && parseInt(numDiv.innerText) !== Math.max(1, remaining)) {
+                    numDiv.innerText = Math.max(1, remaining);
+                }
+            }
+            requestAnimationFrame(waitForSync);
         }
+    }
+    
+    requestAnimationFrame(waitForSync);
+}
         
         // ========== إرسال أمر البث ==========
         function broadcastSync(targetTime) {
@@ -803,24 +839,35 @@ function connectSocket() {
         reconnectionAttempts: 5
     });
     
+    // مصفوفة لتخزين قياسات فرق التوقيت (لتحسين الدقة)
+    let serverOffsets = [];
+    
+    // دالة محدثة لحساب فرق التوقيت بدقة عالية
+    function updateServerOffset() {
+        if (!socket || !socket.connected) return;
+        
+        const start = performance.now() + performance.timeOrigin;
+        socket.emit('get-server-time');
+        socket.once('server-time', (serverTime) => {
+            const end = performance.now() + performance.timeOrigin;
+            const rtt = end - start;
+            const offset = serverTime - (start + rtt / 2);
+            
+            serverOffsets.push(offset);
+            if (serverOffsets.length > 5) serverOffsets.shift();
+            
+            serverOffset = serverOffsets.reduce((a, b) => a + b, 0) / serverOffsets.length;
+            console.log(`🕐 فرق التوقيت المحدث: ${serverOffset.toFixed(2)}ms (معدل ${serverOffsets.length} قياسات)`);
+        });
+    }
+    
     socket.on('connect', () => {
         console.log('✅ متصل بالسيرفر');
-        
-        // دالة تحديث فرق التوقيت مع السيرفر
-        function updateServerOffset() {
-            const clientTime = Date.now();
-            socket.emit('get-server-time');
-            socket.once('server-time', (serverTime) => {
-                const roundtrip = Date.now() - clientTime;
-                serverOffset = serverTime - (clientTime + roundtrip / 2);
-                console.log(`🕐 فرق التوقيت مع السيرفر: ${serverOffset}ms`);
-            });
-        }
         
         // تحديث أول مرة
         updateServerOffset();
         
-        // تحديث كل 30 ثانية للحفاظ على الدقة (لأن ساعات الأجهزة تتفاوت مع الوقت)
+        // تحديث كل 30 ثانية بعدة قياسات للدقة
         setInterval(updateServerOffset, 30000);
         
         showToast('✅ متصل بالخادم - جاهز للبث');
@@ -833,7 +880,7 @@ function connectSocket() {
         showToast('⚠️ مشكلة في الاتصال، حاول تحديث الصفحة');
     });
     
-socket.on('execute-sync', (data) => {
+    socket.on('execute-sync', (data) => {
         console.log('📥 استلام أمر بث:', data);
         if (data.targetTime !== undefined && data.startAt) {
             executeSyncPrecise(data.targetTime, data.startAt);
