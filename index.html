@@ -1,0 +1,994 @@
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NEONIX | Temporal AI Player - المزامنة اليدوية</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* -------------------- VARIABLES -------------------- */
+        :root {
+            --global-skip-seconds: 10;
+            --controls-bar-height: 56px;
+            --control-icon-size: 1.4rem;
+            --skip-btn-size: 48px;
+            --progress-bar-height: 5px;
+            --time-font-size: 0.9rem;
+            --adjust-btn-size: 44px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: radial-gradient(circle at 20% 30%, #0a0f1c, #03060c);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow-x: hidden;
+            padding: 1.5rem;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            box-shadow: inset 0 0 70px rgba(37, 99, 235, 0.25), 0 0 90px rgba(59,130,246,0.2);
+            z-index: 2;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 1400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            z-index: 5;
+            position: relative;
+        }
+
+        /* ========== أزرار الضبط اليدوي ========== */
+        .adjust-buttons {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+        .adjust-btn {
+            width: var(--adjust-btn-size);
+            height: var(--adjust-btn-size);
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(96, 165, 250, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #E5E7EB;
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 0 8px rgba(59,130,246,0.3);
+        }
+        .adjust-btn:hover {
+            transform: scale(1.05);
+            background: rgba(37, 99, 235, 0.8);
+            border-color: #60A5FA;
+            box-shadow: 0 0 16px #3b82f6;
+        }
+        .adjust-btn:active {
+            transform: scale(0.95);
+        }
+        .offset-indicator {
+            position: fixed;
+            top: 20px;
+            right: 110px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            padding: 5px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            color: #93C5FD;
+            font-family: monospace;
+            z-index: 100;
+            pointer-events: none;
+            border: 1px solid rgba(96,165,250,0.3);
+        }
+
+        /* Upload Button */
+        .upload-btn {
+            width: 260px;
+            height: 64px;
+            background: rgba(17, 24, 39, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(96, 165, 250, 0.35);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.35s ease;
+            box-shadow: 0 0 12px rgba(59,130,246,0.3);
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: #E5E7EB;
+        }
+        .upload-btn i { font-size: 1.5rem; color: #93C5FD; }
+        .upload-btn:hover {
+            transform: scale(1.03);
+            background: rgba(30, 41, 59, 0.85);
+            border-color: rgba(96, 165, 250, 0.7);
+            box-shadow: 0 0 24px #3b82f6;
+        }
+
+        .player-wrapper {
+            width: 78vw;
+            height: 44vw;
+            max-width: 1280px;
+            max-height: 720px;
+            background: #000000;
+            position: relative;
+            border-radius: 0px;
+            overflow: hidden;
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.8), 0 0 0 1px rgba(59,130,246,0.2);
+        }
+        #videoPlayer {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: black;
+            display: block;
+            cursor: pointer;
+        }
+
+        /* ساعة الجهاز */
+        .video-clock {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-family: 'Poppins', monospace;
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #E5E7EB;
+            border: 1px solid rgba(96, 165, 250, 0.5);
+            z-index: 30;
+            letter-spacing: 1px;
+            pointer-events: none;
+            box-shadow: 0 0 8px rgba(59,130,246,0.3);
+            transition: opacity 0.3s ease, transform 0.2s ease;
+        }
+        .video-clock span { color: #60A5FA; font-weight: 600; }
+        .video-clock.hide-clock {
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 15;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .loader-ring {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 10px solid rgba(191, 219, 254, 0.25);
+            border-top: 10px solid rgba(191, 219, 254, 0.7);
+            border-bottom: 10px solid #3B82F6;
+            animation: spinLoader 1.4s linear infinite;
+        }
+        @keyframes spinLoader {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden-loader { display: none; }
+
+        /* شريط التحكم */
+        .controls-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            z-index: 25;
+            transition: opacity 0.3s ease, transform 0.2s ease;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .controls-container.hide-controls {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(8px);
+        }
+
+        .progress-container {
+            width: 100%;
+            height: var(--progress-bar-height);
+            background: rgba(148, 163, 184, 0.3);
+            cursor: pointer;
+            position: relative;
+            transition: height 0.1s;
+        }
+        .progress-filled {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #2563EB, #60A5FA);
+            position: relative;
+        }
+        .progress-container:hover { height: 8px; }
+
+        .controls-bar {
+            height: var(--controls-bar-height);
+            background: rgba(15, 23, 42, 0.94);
+            backdrop-filter: blur(12px);
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(96,165,250,0.25);
+        }
+        .left-controls { display: flex; align-items: center; gap: 8px; }
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: #E5E7EB;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: var(--control-icon-size);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-btn:hover { color: #60A5FA; transform: scale(1.05); text-shadow: 0 0 6px #3b82f6; }
+        .play-pause-btn { font-size: calc(var(--control-icon-size) + 0.2rem); width: auto; }
+        .volume-btn { margin-left: 12px; font-size: var(--control-icon-size); }
+        
+        .time-text {
+            margin-left: 18px;
+            color: rgba(229, 231, 235, 0.9);
+            font-size: var(--time-font-size);
+            font-weight: 500;
+            font-family: monospace;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 12px;
+            transition: 0.2s;
+            background: rgba(0,0,0,0.3);
+        }
+        .time-text:hover { background: rgba(59,130,246,0.3); color: #93C5FD; }
+        
+        .right-controls { display: flex; align-items: center; gap: 16px; }
+        
+        .skip-global-btn {
+            width: var(--skip-btn-size);
+            height: var(--skip-btn-size);
+            border-radius: 50%;
+            background: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s ease;
+            cursor: pointer;
+            font-size: calc(var(--skip-btn-size) * 0.35);
+        }
+        .skip-global-btn span { font-weight: 800; font-size: calc(var(--skip-btn-size) * 0.4); }
+        .skip-global-btn:hover {
+            border-color: #3B82F6;
+            box-shadow: 0 0 16px #3b82f6;
+            transform: scale(1.03);
+            background: rgba(59,130,246,0.2);
+        }
+        .fullscreen-btn { font-size: var(--control-icon-size); background: transparent; border: none; color: #E5E7EB; cursor: pointer; margin-left: 4px;}
+        .fullscreen-btn:hover { color: #60A5FA; transform: scale(1.1); }
+
+        /* نافذة تعديل الوقت */
+        .time-edit-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+        }
+        .time-edit-card {
+            background: #111827;
+            border: 1px solid #3B82F6;
+            border-radius: 28px;
+            padding: 1.5rem;
+            width: 270px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(59,130,246,0.5);
+        }
+        .time-edit-card h3 { color: #E5E7EB; margin-bottom: 1rem; font-size: 1.1rem; }
+        .time-input {
+            background: #1E293B;
+            border: 1px solid #60A5FA;
+            border-radius: 40px;
+            padding: 8px;
+            width: 100%;
+            font-size: 1rem;
+            color: white;
+            text-align: center;
+            margin: 1rem 0;
+            outline: none;
+        }
+        .edit-buttons { display: flex; gap: 12px; justify-content: center; }
+        .edit-btn {
+            background: #2563EB;
+            border: none;
+            padding: 6px 18px;
+            border-radius: 40px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .edit-btn.cancel { background: #4B5563; }
+        .edit-btn:hover { background: #3B82F6; transform: scale(1.02); }
+
+/* ضوء الحالة */
+    
+    /* ضوء الحالة */
+.status-light {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #4B5563;
+    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    transition: background-color 0.05s ease;
+    z-index: 100;
+}
+
+.status-light.green {
+    background-color: #22C55E;
+    box-shadow: 0 0 10px #22C55E;
+}
+    
+    #toggleLightBtn.active {
+    background: rgba(34, 197, 94, 0.8) !important;
+    border-color: #22C55E !important;
+}
+#toggleLightBtn.inactive {
+    background: rgba(220, 38, 38, 0.8) !important;
+    border-color: #EF4444 !important;
+}
+    
+    
+    
+    /* ========== أزرار الضبط الجديدة (1s و 5ms) ========== */
+.new-adjust-panel {
+    position: fixed;
+    top: 20px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(12px);
+    padding: 12px;
+    border-radius: 24px;
+    border: 1px solid rgba(96,165,250,0.4);
+    min-width: 150px;
+}
+.new-adjust-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+.new-adjust-btn {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(96, 165, 250, 0.6);
+    border-radius: 16px;
+    color: #E5E7EB;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: monospace;
+}
+.new-adjust-btn.large {
+    width: 65px;
+    height: 44px;
+    font-size: 0.9rem;
+}
+.new-adjust-btn.small {
+    width: 55px;
+    height: 38px;
+    font-size: 0.7rem;
+}
+.new-adjust-btn:hover {
+    background: rgba(37, 99, 235, 0.8);
+    border-color: #60A5FA;
+    transform: scale(1.02);
+}
+.new-adjust-btn:active {
+    transform: scale(0.96);
+}
+.new-offset-label {
+    text-align: center;
+    color: #93C5FD;
+    font-size: 0.65rem;
+    font-family: monospace;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(96,165,250,0.3);
+}
+    
+    .status-light {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #4B5563;
+    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    transition: none; /* لا تستخدم transition للاستجابة السريعة */
+    z-index: 100;
+}
+
+.status-light.green {
+    background-color: #0F0 !important;
+    box-shadow: 0 0 25px #0F0, 0 0 50px #0F0, 0 0 75px #0F0 !important;
+}
+        @media (max-width: 780px) {
+            .player-wrapper { width: 92vw; height: 52vw; }
+            .controls-bar { padding: 0 12px; }
+            .time-text { margin-left: 12px; font-size: 0.75rem; }
+            .volume-btn { margin-left: 8px; }
+            .right-controls { gap: 10px; }
+            .video-clock { top: 8px; right: 12px; font-size: 0.7rem; padding: 3px 10px; }
+            .adjust-buttons { top: 12px; right: 12px; gap: 6px; }
+            .adjust-btn { width: 38px; height: 38px; font-size: 0.8rem; }
+            .offset-indicator { top: 12px; right: 70px; font-size: 0.6rem; padding: 3px 8px; }
+        }
+    </style>
+</head>
+<body>
+<div class="status-light" id="statusLight"></div>
+    
+<div class="app-container">
+    <!-- أزرار الضبط اليدوي -->
+    <div class="adjust-buttons">
+        <!-- زر تفعيل الضوء -->
+        <!-- أزرار الضبط الجديدة (1s و 5ms) -->
+<div class="new-adjust-panel">
+    <div class="new-adjust-row">
+        <div class="new-adjust-btn large" id="newSubSecBtn">-1s</div>
+        <div class="new-adjust-btn large" id="newAddSecBtn">+1s</div>
+    </div>
+    <div class="new-adjust-row">
+        <div class="new-adjust-btn small" id="newSubMsBtn">-5ms</div>
+        <div class="new-adjust-btn small" id="newAddMsBtn">+5ms</div>
+    </div>
+    <div class="new-offset-label" id="newOffsetLabel">الضبط: 0.000 ث</div>
+</div>
+       
+        <div class="new-adjust-btn large" id="toggleLightBtn" style="background: rgba(100, 100, 100, 0.8); transform: translateX(-180px);">تفعيل</div>
+        
+    </div>
+   
+
+    <div class="upload-btn" id="uploadTrigger">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <span>Choose Files</span>
+    </div>
+    <input type="file" id="videoUpload" accept="video/mp4,video/webm, video/ogg" style="display: none;">
+
+    <div class="player-wrapper" id="playerWrapper">
+        <video id="videoPlayer" preload="metadata"></video>
+        
+        <!-- ساعة الجهاز -->
+        <div class="video-clock" id="videoClockDisplay">
+            ⏱️ <span id="liveMinSec">--:--</span>
+        </div>
+        
+        <div id="loadingOverlay" class="loading-overlay"><div class="loader-ring"></div></div>
+        
+        <div id="controlsContainer" class="controls-container">
+            <div class="progress-container" id="progressBarContainer">
+                <div class="progress-filled" id="progressFilled"></div>
+            </div>
+            <div class="controls-bar">
+                <div class="left-controls">
+                    <button class="icon-btn play-pause-btn" id="playPauseBtn"><i class="fas fa-play"></i></button>
+                    <button class="icon-btn volume-btn" id="volumeBtn"><i class="fas fa-volume-up"></i></button>
+                    <div class="time-text" id="timeTextDisplay">0:00 / -:--</div>
+                </div>
+                <div class="right-controls">
+                    <div class="skip-global-btn" id="globalSkipBtn"><span id="skipBtnText">10S</span></div>
+                    <button class="icon-btn fullscreen-btn" id="fullscreenBtn"><i class="fas fa-expand"></i></button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="timeEditModal" class="time-edit-modal">
+            <div class="time-edit-card">
+                <h3>✎ تعديل الوقت</h3>
+                <input type="text" id="timeInputField" class="time-input" placeholder="مثال: 1:24 أو 125">
+                <div class="edit-buttons">
+                    <button id="confirmTimeBtn" class="edit-btn">انتقال & إيقاف</button>
+                    <button id="cancelTimeBtn" class="edit-btn cancel">إلغاء</button>
+                </div>
+                <small style="color:#94a3b8;">الصيغة: ثواني (84) أو دقائق:ثواني</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ========== ضبط الوقت اليدوي ==========
+        let manualOffsetMs = 0;
+        const liveMinSecSpan = document.getElementById('liveMinSec');
+        const offsetIndicator = document.getElementById('offsetIndicator');
+        const addOffsetBtn = document.getElementById('addOffsetBtn');
+        const subOffsetBtn = document.getElementById('subOffsetBtn');
+        const videoClock = document.getElementById('videoClockDisplay');
+        const statusLight = document.getElementById('statusLight');
+        
+        // أضف هذا مع باقي المتغيرات (قبل updateDisplayedClock)
+// ========== إدارة الضوء (يشتغل فقط عند التفعيل) ==========
+let lastLightState = false; // أضف هذا مع المتغيرات
+let isLightActive = false;
+let lightLoopId = null;
+let lightIntervalId = null;
+        
+function startLight() {
+    if (lightLoopId) cancelAnimationFrame(lightLoopId);
+    
+    function lightFrame() {
+        if (isLightActive) {
+            updateStatusLight();
+            requestAnimationFrame(lightFrame);
+        }
+    }
+    lightLoopId = requestAnimationFrame(lightFrame);
+}
+
+function stopLight() {
+    if (lightLoopId) {
+        cancelAnimationFrame(lightLoopId);
+        lightLoopId = null;
+    }
+    if (lightIntervalId) {
+        clearInterval(lightIntervalId);
+        lightIntervalId = null;
+    }
+    statusLight.classList.remove('green');
+    isLightOn = false;
+}
+
+function toggleLight() {
+    const lightBtn = document.getElementById('toggleLightBtn');
+    isLightActive = !isLightActive;
+    
+    if (isLightActive) {
+        lightBtn.classList.add('active');
+        lightBtn.classList.remove('inactive');
+        lightBtn.innerHTML = 'تفعيل';
+        startLight();
+    } else {
+        lightBtn.classList.add('inactive');
+        lightBtn.classList.remove('active');
+        lightBtn.innerHTML = 'إيقاف';
+        stopLight();
+    }
+}
+
+// ربط زر التفعيل
+document.getElementById('toggleLightBtn').addEventListener('click', toggleLight);
+
+// تعديل updateStatusLight لتستخدم المتغير العام
+function updateStatusLight() {
+    if (!isLightActive) return; // إذا الضوء معطل، لا تفعل شي
+    
+    const now = new Date(Date.now() + manualOffsetMs);
+    const ms = now.getMilliseconds();
+    const remainder = ms % 10;
+  //  const shouldBeGreen = (ms >= 550 && remainder >= 0 && remainder < 5);
+    const shouldBeGreen = (ms >= 500 && ms < 517);
+    if (shouldBeGreen !== lastLightState) {
+        lastLightState = shouldBeGreen;
+        if (shouldBeGreen) {
+            statusLight.classList.add('green');
+        } else {
+            statusLight.classList.remove('green');
+        }
+    }
+}
+       
+        
+// دالة للضغط المستمر (استمرار الضغط يكرر الإجراء)
+function makeHoldRepeat(
+    buttonId,
+    callback,
+    fastInterval = 20,
+    holdDelay = 500
+) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+
+    let intervalId = null;
+    let timeoutId = null;
+    let isHolding = false;
+
+    function startHold(e) {
+        e.preventDefault();
+
+        // يمنع التكرار إذا كان ضاغط بالفعل
+        if (isHolding) return;
+
+        isHolding = true;
+
+        // تنفيذ أول ضغطة مباشرة
+        callback();
+
+        // بعد مدة يبدأ التكرار السريع
+        timeoutId = setTimeout(() => {
+
+            intervalId = setInterval(() => {
+                callback();
+            }, fastInterval);
+
+        }, holdDelay);
+    }
+
+    function stopHold() {
+        isHolding = false;
+
+        clearTimeout(timeoutId);
+        clearInterval(intervalId);
+
+        timeoutId = null;
+        intervalId = null;
+    }
+
+    // Desktop
+    btn.addEventListener('mousedown', startHold);
+    document.addEventListener('mouseup', stopHold);
+
+    // Mobile
+    btn.addEventListener('touchstart', startHold, { passive: false });
+    document.addEventListener('touchend', stopHold);
+    document.addEventListener('touchcancel', stopHold);
+
+    // لو خرج الإصبع خارج الزر
+    btn.addEventListener('mouseleave', stopHold);
+}
+         
+        function updateDisplayedClock() {
+    const now = new Date(Date.now() + manualOffsetMs);
+    const mins = now.getMinutes();
+    const secs = now.getSeconds();
+    const ms = now.getMilliseconds();
+    //liveMinSecSpan.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+    liveMinSecSpan.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+   // offsetIndicator.innerText = `الضبط: ${(manualOffsetMs / 1000).toFixed(1)} ث`;
+ //   updateStatusLight();
+}
+        
+        function addOffset() { manualOffsetMs += 50; updateDisplayedClock(); }
+        function subOffset() { manualOffsetMs -= 50; updateDisplayedClock(); }
+        
+      //  addOffsetBtn.addEventListener('click', addOffset);
+   //     subOffsetBtn.addEventListener('click', subOffset);
+        
+        function getAdjustedDate() { return new Date(Date.now() + manualOffsetMs); }
+        
+        // عناصر الأزرار الجديدة
+const newOffsetLabel = document.getElementById('newOffsetLabel');
+
+// دوال الضبط الجديدة (1s و 5ms)
+function addSecondNew() { manualOffsetMs += 1000; updateDisplayedClock(); updateNewLabel(); }
+function subSecondNew() { manualOffsetMs -= 1000; updateDisplayedClock(); updateNewLabel(); }
+function addMilliNew() { manualOffsetMs += 5; updateDisplayedClock(); updateNewLabel(); }
+function subMilliNew() { manualOffsetMs -= 5; updateDisplayedClock(); updateNewLabel(); }
+
+function updateNewLabel() {
+    const totalSeconds = manualOffsetMs / 1000;
+    if (newOffsetLabel) newOffsetLabel.innerText = `الضبط: ${totalSeconds.toFixed(3)} ث`;
+}
+
+// ربط الأزرار الجديدة
+// ربط الأزرار الجديدة مع الضغط المستمر
+//makeHoldRepeat('newAddSecBtn', () => { manualOffsetMs += 1000; updateDisplayedClock(); updateNewLabel(); }, 50, 2000);
+//makeHoldRepeat('newSubSecBtn', () => { manualOffsetMs -= 1000; updateDisplayedClock(); updateNewLabel(); }, 50, 2000);
+document.getElementById('newAddSecBtn').addEventListener('click', addSecondNew);
+document.getElementById('newSubSecBtn').addEventListener('click', subSecondNew);
+
+makeHoldRepeat('newAddMsBtn', () => { manualOffsetMs += 5; updateDisplayedClock(); updateNewLabel(); }, 10, 300);
+makeHoldRepeat('newSubMsBtn', () => { manualOffsetMs -= 5; updateDisplayedClock(); updateNewLabel(); }, 10, 300);
+        
+// makeHoldRepeat('addOffsetBtn', () => { manualOffsetMs += 50; updateDisplayedClock(); updateNewLabel(); }, 50);
+// makeHoldRepeat('subOffsetBtn', () => { manualOffsetMs -= 50; updateDisplayedClock(); updateNewLabel(); }, 50);
+        
+        setInterval(updateDisplayedClock, 100);
+        updateDisplayedClock();
+        
+        
+        
+        // ========== مشغل الفيديو ==========
+        const rootStyles = getComputedStyle(document.documentElement);
+        let GLOBAL_SKIP_SECONDS = parseInt(rootStyles.getPropertyValue('--global-skip-seconds').trim());
+        if(isNaN(GLOBAL_SKIP_SECONDS)) GLOBAL_SKIP_SECONDS = 10;
+        document.getElementById('skipBtnText').innerText = GLOBAL_SKIP_SECONDS + "S";
+        
+        const video = document.getElementById('videoPlayer');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playIcon = playPauseBtn.querySelector('i');
+        const volumeBtn = document.getElementById('volumeBtn');
+        const volumeIcon = volumeBtn.querySelector('i');
+        const timeTextSpan = document.getElementById('timeTextDisplay');
+        const progressContainer = document.getElementById('progressBarContainer');
+        const progressFilled = document.getElementById('progressFilled');
+        const globalSkipBtn = document.getElementById('globalSkipBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const uploadTrigger = document.getElementById('uploadTrigger');
+        const videoUploadInput = document.getElementById('videoUpload');
+        const playerWrapper = document.getElementById('playerWrapper');
+        const controlsContainer = document.getElementById('controlsContainer');
+        const modal = document.getElementById('timeEditModal');
+        const timeInputField = document.getElementById('timeInputField');
+        const confirmTimeBtn = document.getElementById('confirmTimeBtn');
+        const cancelTimeBtn = document.getElementById('cancelTimeBtn');
+        
+        let controlsTimer = null;
+        let isControlsVisible = true;
+        let isDragging = false;
+        
+    
+        
+        
+        function showLoader(show) {
+            if(show) { loadingOverlay.classList.remove('hidden-loader'); loadingOverlay.style.display = 'flex'; }
+            else { loadingOverlay.classList.add('hidden-loader'); loadingOverlay.style.display = 'none'; }
+        }
+        
+        function formatTime(seconds) {
+            if(isNaN(seconds)) return "0:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2,'0')}`;
+        }
+        
+        function updateUI() {
+            if(!video.duration || isNaN(video.duration)) {
+                timeTextSpan.innerText = `0:00 / -:--`;
+                return;
+            }
+            timeTextSpan.innerText = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+            progressFilled.style.width = `${(video.currentTime / video.duration) * 100}%`;
+        }
+        
+        function handleSeek(clientX) {
+            if(!video.duration || isNaN(video.duration)) return;
+            const rect = progressContainer.getBoundingClientRect();
+            let clickX = clientX - rect.left;
+            if(clickX < 0) clickX = 0;
+            if(clickX > rect.width) clickX = rect.width;
+            video.currentTime = (clickX / rect.width) * video.duration;
+            updateUI();
+        }
+        
+        progressContainer.addEventListener('mousedown', (e) => { isDragging = true; handleSeek(e.clientX); e.preventDefault(); });
+        window.addEventListener('mousemove', (e) => { if(isDragging) handleSeek(e.clientX); });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+        progressContainer.addEventListener('touchstart', (e) => { isDragging = true; handleSeek(e.touches[0].clientX); e.preventDefault(); });
+        window.addEventListener('touchmove', (e) => { if(isDragging && e.touches.length) handleSeek(e.touches[0].clientX); });
+        window.addEventListener('touchend', () => { isDragging = false; });
+        
+        // ========== التحكم في إظهار/إخفاء الأزرار (تم التعديل) ==========
+        function resetHideTimer() {
+            if(controlsTimer) clearTimeout(controlsTimer);
+            if(!video.paused && isControlsVisible) {
+                controlsTimer = setTimeout(() => {
+                    if(!video.paused && isControlsVisible) {
+                        controlsContainer.classList.add('hide-controls');
+                        if(videoClock) videoClock.classList.add('hide-clock');
+                        isControlsVisible = false;
+                    }
+                }, 2500);
+            }
+        }
+        
+        function showControls(keepVisible = false) {
+            if(controlsContainer.classList.contains('hide-controls')) {
+                controlsContainer.classList.remove('hide-controls');
+                if(videoClock) videoClock.classList.remove('hide-clock');
+            }
+            isControlsVisible = true;
+            if(controlsTimer) clearTimeout(controlsTimer);
+            if(!keepVisible && !video.paused) resetHideTimer();
+        }
+        
+        function hideControls() {
+            if(!video.paused && isControlsVisible) {
+                controlsContainer.classList.add('hide-controls');
+                if(videoClock) videoClock.classList.add('hide-clock');
+                isControlsVisible = false;
+                if(controlsTimer) clearTimeout(controlsTimer);
+            }
+        }
+        
+        // حدث النقر على الفيديو (نقرة واحدة تظهر/تخفي)
+        video.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isControlsVisible) {
+                controlsContainer.classList.add('hide-controls');
+                if(videoClock) videoClock.classList.add('hide-clock');
+                isControlsVisible = false;
+                if (controlsTimer) clearTimeout(controlsTimer);
+            } else {
+                controlsContainer.classList.remove('hide-controls');
+                if(videoClock) videoClock.classList.remove('hide-clock');
+                isControlsVisible = true;
+                resetHideTimer();
+            }
+        });
+        
+        // عند بدء التشغيل: أظهر الأزرار ثم اخفها تلقائياً
+        video.addEventListener('play', () => {
+            showControls(true);
+        });
+        
+        // عند الإيقاف: أظهر الأزرار بشكل دائم
+        video.addEventListener('pause', () => { 
+            showControls(true); 
+            if(videoClock) videoClock.classList.remove('hide-clock');
+            if(controlsTimer) clearTimeout(controlsTimer); 
+        });
+        
+        // تم حذف حدث mousemove بالكامل
+        
+        // زر التخطي العالمي
+        globalSkipBtn.addEventListener('click', () => {
+            const now = getAdjustedDate();
+            let currentSec = now.getSeconds();
+            let targetSec = Math.ceil(currentSec / GLOBAL_SKIP_SECONDS) * GLOBAL_SKIP_SECONDS;
+            if(targetSec === 60) targetSec = 0;
+            let delayMs = (new Date(now.getTime()).setSeconds(targetSec, 0)) - now.getTime();
+            if(delayMs < 0) delayMs += 60000;
+            
+            globalSkipBtn.style.borderColor = "#60A5FA";
+            setTimeout(() => { globalSkipBtn.style.borderColor = ""; }, 200);
+            if(!video.paused) video.pause();
+            showLoader(true);
+            
+            setTimeout(() => {
+                if(video.src) video.play().then(() => showLoader(false)).catch(() => showLoader(false));
+                else { showLoader(false); alert("الرجاء رفع فيديو أولاً"); }
+            }, delayMs);
+        });
+        
+        // تعديل الوقت
+        function openTimeEdit() {
+            if(!video.duration || isNaN(video.duration)) return;
+            if(!video.paused) video.pause();
+            modal.style.visibility = 'visible';
+            modal.style.opacity = '1';
+            timeInputField.value = formatTime(video.currentTime);
+        }
+        function closeModal() { modal.style.visibility = 'hidden'; modal.style.opacity = '0'; }
+        function parseTimeToSeconds(str) {
+            str = str.trim();
+            if(str.includes(':')){
+                let parts = str.split(':');
+                if(parts.length===2) return parseInt(parts[0])*60 + parseInt(parts[1]);
+                if(parts.length===3) return parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2]);
+            }
+            let secs = parseInt(str);
+            return isNaN(secs) ? NaN : secs;
+        }
+        timeTextSpan.addEventListener('click', openTimeEdit);
+        confirmTimeBtn.addEventListener('click', () => {
+            let targetSec = parseTimeToSeconds(timeInputField.value);
+            if(isNaN(targetSec)) { alert("صيغة غير صالحة"); return; }
+            if(targetSec > video.duration) targetSec = video.duration;
+            video.currentTime = targetSec;
+            updateUI();
+            video.pause();
+            updatePlayButton();
+            closeModal();
+        });
+        cancelTimeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
+        
+        function updatePlayButton() { playIcon.className = video.paused ? "fas fa-play" : "fas fa-pause"; }
+        function togglePlayPause() { if(video.src) video.paused ? video.play() : video.pause(); }
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        video.addEventListener('play', updatePlayButton);
+        video.addEventListener('pause', updatePlayButton);
+        
+        volumeBtn.addEventListener('click', () => {
+            if(video.muted) { video.muted = false; volumeIcon.className = "fas fa-volume-up"; }
+            else { video.muted = true; volumeIcon.className = "fas fa-volume-mute"; }
+        });
+        video.volume = 0.6;
+        
+        function toggleFullscreen() {
+            if(!document.fullscreenElement) playerWrapper.requestFullscreen().catch(e=>console.log(e));
+            else document.exitFullscreen();
+        }
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        
+        uploadTrigger.addEventListener('click', () => videoUploadInput.click());
+        videoUploadInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file && file.type.startsWith('video/')) {
+                const url = URL.createObjectURL(file);
+                video.src = url;
+                video.load();
+                showLoader(true);
+                video.onloadedmetadata = () => { updateUI(); showLoader(false); };
+                video.oncanplay = () => showLoader(false);
+            }
+        });
+        
+        
+        
+        video.addEventListener('timeupdate', () => { if(!isDragging) updateUI(); });
+        video.addEventListener('loadedmetadata', updateUI);
+        video.addEventListener('waiting', () => showLoader(true));
+        video.addEventListener('canplay', () => showLoader(false));
+        showLoader(false);
+        if(!video.src) timeTextSpan.innerText = "0:00 / -:--";
+    })();
+</script>
+</body>
+</html>
