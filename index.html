@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>NEONIX | Temporal AI Player - البث المتزامن الدقيق</title>
+    <title>NEONIX | Temporal AI Player - البث المتزامن</title>
     <!-- Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -648,124 +648,82 @@
 
 <script>
     (function(){
-        // ========== نظام البث المتزامن عبر Socket.IO مع توقيت دقيق ==========
-        let roomId = 'default-room';
+        // ========== الاتصال بالسيرفر (غرفة واحدة للجميع) ==========
         let socket = null;
-        let serverOffset = 0; // الفرق بين وقت السيرفر ووقت الجهاز
-        
-        // إنشاء معرف غرفة من رابط الصفحة
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlRoom = urlParams.get('room');
-        if (urlRoom) roomId = urlRoom;
-        else {
-            roomId = localStorage.getItem('syncRoomId');
-            if (!roomId) {
-                roomId = 'room_' + Math.random().toString(36).substring(2, 10);
-                localStorage.setItem('syncRoomId', roomId);
-            }
-            const newUrl = window.location.href.split('?')[0] + '?room=' + roomId;
-            window.history.replaceState({}, '', newUrl);
-        }
-        
-        // عرض معرف الغرفة
-        const roomDisplay = document.createElement('div');
-        roomDisplay.style.cssText = 'position:fixed; bottom:10px; left:10px; background:rgba(0,0,0,0.6); color:#60A5FA; padding:4px 10px; border-radius:20px; font-size:10px; font-family:monospace; z-index:200;';
-        roomDisplay.innerText = `🏠 غرفة: ${roomId}`;
-        document.body.appendChild(roomDisplay);
-        
-        // الاتصال بالسيرفر
-        function connectSocket() {
-            socket = io({
-                transports: ['websocket', 'polling'],
-                reconnection: true,
-                reconnectionAttempts: 5
-            });
-            
-            socket.on('connect', () => {
-                console.log('✅ متصل بالسيرفر');
-                socket.emit('join-room', roomId);
-                
-                // حساب فرق الوقت مع السيرفر (للدقة المتناهية)
-                const clientTime = Date.now();
-                socket.emit('get-server-time');
-                socket.once('server-time', (serverTime) => {
-                    const roundtrip = Date.now() - clientTime;
-                    serverOffset = serverTime - (clientTime + roundtrip / 2);
-                    console.log(`🕐 فرق التوقيت مع السيرفر: ${serverOffset}ms`);
-                });
-                
-                showToast('✅ متصل بالخادم - جاهز للبث');
-                const light = document.getElementById('statusLight');
-                if (light) light.style.backgroundColor = '#22C55E';
-            });
-            
-            socket.on('connect_error', (err) => {
-                console.log('⚠️ خطأ في الاتصال:', err);
-                showToast('⚠️ مشكلة في الاتصال، حاول تحديث الصفحة');
-            });
-            
-            // استقبال أمر البث المعدل (مع startAt)
-            socket.on('execute-sync', (data) => {
-                console.log('📥 استلام أمر بث:', data);
-                if (data.targetTime !== undefined && data.startAt) {
-                    executeSyncPrecise(data.targetTime, data.startAt);
-                }
-            });
-            
-            socket.on('disconnect', () => {
-                console.log('❌ انقطع الاتصال');
-                const light = document.getElementById('statusLight');
-                if (light) light.style.backgroundColor = '#4B5563';
-            });
-        }
-        
-        // تنفيذ المزامنة بدقة عالية باستخدام وقت السيرفر
+        let serverOffset = 0;
         let countdownInterval = null;
         
-        function executeSyncPrecise(targetTime, startAt) {
-            if (!video.src || !video.duration) return;
-            
-            // حساب التأخير المتبقي حتى وقت البدء
-            const now = Date.now();
-            let delay = startAt - now;
-            
-            // تصحيح حسب فرق الوقت مع السيرفر
-            if (serverOffset !== 0) {
-                delay = startAt - (now + serverOffset);
-            }
-            
-            console.log(`⏱️ التأخير المتبقي: ${delay}ms | targetTime: ${targetTime}`);
-            
-            if (delay < 0) {
-                // لو فات الوقت، ننفذ فوراً
-                console.log('⚠️ فات الوقت، تنفيذ فوري');
-                video.currentTime = targetTime;
-                video.play().catch(e => console.log);
-                showToast(`⚡ مزامنة فورية! التشغيل من ${formatTime(targetTime)}`);
+        // ========== عناصر الصفحة ==========
+        const video = document.getElementById('videoPlayer');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playIcon = playPauseBtn.querySelector('i');
+        const volumeBtn = document.getElementById('volumeBtn');
+        const volumeIcon = volumeBtn.querySelector('i');
+        const timeTextSpan = document.getElementById('timeTextDisplay');
+        const progressContainer = document.getElementById('progressBarContainer');
+        const progressFilled = document.getElementById('progressFilled');
+        const syncBroadcastBtn = document.getElementById('syncBroadcastBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const uploadTrigger = document.getElementById('uploadTrigger');
+        const videoUploadInput = document.getElementById('videoUpload');
+        const playerWrapper = document.getElementById('playerWrapper');
+        const controlsContainer = document.getElementById('controlsContainer');
+        const modal = document.getElementById('timeEditModal');
+        const timeInputField = document.getElementById('timeInputField');
+        const confirmTimeBtn = document.getElementById('confirmTimeBtn');
+        const cancelTimeBtn = document.getElementById('cancelTimeBtn');
+        const videoClock = document.getElementById('videoClockDisplay');
+        
+        let controlsTimer = null;
+        let isControlsVisible = true;
+        let isDragging = false;
+        
+        // ========== دوال مساعدة ==========
+        function showLoader(show) {
+            if(show) { loadingOverlay.classList.remove('hidden-loader'); loadingOverlay.style.display = 'flex'; }
+            else { loadingOverlay.classList.add('hidden-loader'); loadingOverlay.style.display = 'none'; }
+        }
+        
+        function formatTime(seconds) {
+            if(isNaN(seconds)) return "0:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2,'0')}`;
+        }
+        
+        function updateUI() {
+            if(!video.duration || isNaN(video.duration)) {
+                timeTextSpan.innerText = `0:00 / -:--`;
                 return;
             }
+            timeTextSpan.innerText = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+            progressFilled.style.width = `${(video.currentTime / video.duration) * 100}%`;
+        }
+        
+        function showToast(message) {
+            const oldToast = document.querySelector('.sync-toast');
+            if (oldToast) oldToast.remove();
             
-            // نعرض العد التنازلي للمستخدم
-            showCountdownPrecise(Math.ceil(delay / 1000));
+            const toast = document.createElement('div');
+            toast.className = 'sync-toast';
+            toast.innerText = message;
+            document.body.appendChild(toast);
             
-            // نستخدم setTimeout دقيق
             setTimeout(() => {
-                video.currentTime = targetTime;
-                video.play().catch(e => console.log);
-                showToast(`🎯 مزامنة دقيقة! التشغيل من ${formatTime(targetTime)}`);
-                
-                // تأثير بصري
-                const syncBtn = document.getElementById('syncBroadcastBtn');
-                if (syncBtn) {
-                    syncBtn.classList.add('broadcasting');
-                    setTimeout(() => syncBtn.classList.remove('broadcasting'), 500);
-                }
-            }, Math.max(delay, 0));
+                toast.style.animation = 'fadeOutDown 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+        
+        function hideCountdownOverlay() {
+            const overlay = document.querySelector('.countdown-overlay');
+            if (overlay) overlay.remove();
+            if (countdownInterval) clearInterval(countdownInterval);
         }
         
         function showCountdownPrecise(seconds) {
             hideCountdownOverlay();
-            if (countdownInterval) clearInterval(countdownInterval);
             
             const overlay = document.createElement('div');
             overlay.className = 'countdown-overlay';
@@ -792,42 +750,106 @@
             }, seconds * 1000 + 500);
         }
         
-        function hideCountdownOverlay() {
-            const overlay = document.querySelector('.countdown-overlay');
-            if (overlay) overlay.remove();
+        // ========== تنفيذ المزامنة الدقيقة ==========
+        function executeSyncPrecise(targetTime, startAt) {
+            if (!video.src || !video.duration) return;
+            
+            const now = Date.now();
+            let delay = startAt - now;
+            
+            if (serverOffset !== 0) {
+                delay = startAt - (now + serverOffset);
+            }
+            
+            console.log(`⏱️ التأخير المتبقي: ${delay}ms | targetTime: ${targetTime}`);
+            
+            if (delay < 0) {
+                video.currentTime = targetTime;
+                video.play().catch(e => console.log);
+                showToast(`⚡ مزامنة فورية! التشغيل من ${formatTime(targetTime)}`);
+                return;
+            }
+            
+            showCountdownPrecise(Math.ceil(delay / 1000));
+            
+            setTimeout(() => {
+                video.currentTime = targetTime;
+                video.play().catch(e => console.log);
+                showToast(`🎯 مزامنة دقيقة! التشغيل من ${formatTime(targetTime)}`);
+                
+                syncBroadcastBtn.classList.add('broadcasting');
+                setTimeout(() => syncBroadcastBtn.classList.remove('broadcasting'), 500);
+            }, Math.max(delay, 0));
         }
         
+        // ========== إرسال أمر البث ==========
         function broadcastSync(targetTime) {
             if (!socket || !socket.connected) {
                 showToast('⚠️ غير متصل بالخادم، حاول تحديث الصفحة');
                 return false;
             }
             socket.emit('broadcast-sync', {
-                roomId: roomId,
                 targetTime: targetTime
             });
             return true;
         }
         
-        function showToast(message) {
-            const oldToast = document.querySelector('.sync-toast');
-            if (oldToast) oldToast.remove();
-            
-            const toast = document.createElement('div');
-            toast.className = 'sync-toast';
-            toast.innerText = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'fadeOutDown 0.3s ease';
-                setTimeout(() => toast.remove(), 300);
-            }, 2500);
+        // ========== الاتصال بالسيرفر ==========
+        // ========== الاتصال بالسيرفر ==========
+function connectSocket() {
+    socket = io({
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5
+    });
+    
+    socket.on('connect', () => {
+        console.log('✅ متصل بالسيرفر');
+        
+        // دالة تحديث فرق التوقيت مع السيرفر
+        function updateServerOffset() {
+            const clientTime = Date.now();
+            socket.emit('get-server-time');
+            socket.once('server-time', (serverTime) => {
+                const roundtrip = Date.now() - clientTime;
+                serverOffset = serverTime - (clientTime + roundtrip / 2);
+                console.log(`🕐 فرق التوقيت مع السيرفر: ${serverOffset}ms`);
+            });
         }
+        
+        // تحديث أول مرة
+        updateServerOffset();
+        
+        // تحديث كل 30 ثانية للحفاظ على الدقة (لأن ساعات الأجهزة تتفاوت مع الوقت)
+        setInterval(updateServerOffset, 30000);
+        
+        showToast('✅ متصل بالخادم - جاهز للبث');
+        const light = document.getElementById('statusLight');
+        if (light) light.style.backgroundColor = '#22C55E';
+    });
+    
+    socket.on('connect_error', (err) => {
+        console.log('⚠️ خطأ في الاتصال:', err);
+        showToast('⚠️ مشكلة في الاتصال، حاول تحديث الصفحة');
+    });
+    
+    socket.on('execute-sync', (data) => {
+        console.log('📥 استلام أمر بث:', data);
+        if (data.targetTime !== undefined && data.startAt) {
+            executeSyncPrecise(data.targetTime, data.startAt);
+        }
+    });
+    
+    socket.on('disconnect', () => {
+        console.log('❌ انقطع الاتصال');
+        const light = document.getElementById('statusLight');
+        if (light) light.style.backgroundColor = '#4B5563';
+    });
+}
         
         // ========== ضبط الوقت اليدوي ==========
         let manualOffsetMs = 0;
         const liveMinSecSpan = document.getElementById('liveMinSec');
-        const videoClock = document.getElementById('videoClockDisplay');
         const statusLight = document.getElementById('statusLight');
         
         let lastLightState = false;
@@ -932,52 +954,7 @@
         setInterval(updateDisplayedClock, 100);
         updateDisplayedClock();
         
-        // ========== مشغل الفيديو ==========
-        const video = document.getElementById('videoPlayer');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const playPauseBtn = document.getElementById('playPauseBtn');
-        const playIcon = playPauseBtn.querySelector('i');
-        const volumeBtn = document.getElementById('volumeBtn');
-        const volumeIcon = volumeBtn.querySelector('i');
-        const timeTextSpan = document.getElementById('timeTextDisplay');
-        const progressContainer = document.getElementById('progressBarContainer');
-        const progressFilled = document.getElementById('progressFilled');
-        const syncBroadcastBtn = document.getElementById('syncBroadcastBtn');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
-        const uploadTrigger = document.getElementById('uploadTrigger');
-        const videoUploadInput = document.getElementById('videoUpload');
-        const playerWrapper = document.getElementById('playerWrapper');
-        const controlsContainer = document.getElementById('controlsContainer');
-        const modal = document.getElementById('timeEditModal');
-        const timeInputField = document.getElementById('timeInputField');
-        const confirmTimeBtn = document.getElementById('confirmTimeBtn');
-        const cancelTimeBtn = document.getElementById('cancelTimeBtn');
-        
-        let controlsTimer = null;
-        let isControlsVisible = true;
-        let isDragging = false;
-        
-        function showLoader(show) {
-            if(show) { loadingOverlay.classList.remove('hidden-loader'); loadingOverlay.style.display = 'flex'; }
-            else { loadingOverlay.classList.add('hidden-loader'); loadingOverlay.style.display = 'none'; }
-        }
-        
-        function formatTime(seconds) {
-            if(isNaN(seconds)) return "0:00";
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins}:${secs.toString().padStart(2,'0')}`;
-        }
-        
-        function updateUI() {
-            if(!video.duration || isNaN(video.duration)) {
-                timeTextSpan.innerText = `0:00 / -:--`;
-                return;
-            }
-            timeTextSpan.innerText = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-            progressFilled.style.width = `${(video.currentTime / video.duration) * 100}%`;
-        }
-        
+        // ========== أحداث الفيديو ==========
         function handleSeek(clientX) {
             if(!video.duration || isNaN(video.duration)) return;
             const rect = progressContainer.getBoundingClientRect();
@@ -1036,7 +1013,7 @@
         video.addEventListener('play', () => { showControls(true); });
         video.addEventListener('pause', () => { showControls(true); if(videoClock) videoClock.classList.remove('hide-clock'); if(controlsTimer) clearTimeout(controlsTimer); });
         
-        // زر البث المتزامن - يرسل أمر لجميع الأجهزة
+        // زر البث
         syncBroadcastBtn.addEventListener('click', () => {
             if (!video.src || !video.duration) {
                 showToast('⚠️ الرجاء رفع فيديو أولاً');
@@ -1126,7 +1103,7 @@
         showLoader(false);
         if(!video.src) timeTextSpan.innerText = "0:00 / -:--";
         
-        // بدء الاتصال بالسيرفر
+        // بدء الاتصال
         connectSocket();
     })();
 </script>
